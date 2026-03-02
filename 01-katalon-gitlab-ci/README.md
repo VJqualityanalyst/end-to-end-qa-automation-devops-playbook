@@ -115,7 +115,6 @@ trigger_katalon_pipeline:
       curl -X POST --fail
       -F token="TRIGGER_TOKEN"
       -F ref="feature"
-      https://gitlab.example.com/api/v4/projects/123/trigger/pipeline
   only:
     refs:
       - staging
