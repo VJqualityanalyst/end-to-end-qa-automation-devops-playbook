@@ -27,5 +27,5 @@ Cross-repo pipeline triggering, TestOps reporting, and QA gate implementation.
 ---
 
 ## 👤 Author
-**Vijayender Thakur**  
+**Vijayender Singh**  
 QA Automation Engineer | DevOps-Driven Testing Specialist
