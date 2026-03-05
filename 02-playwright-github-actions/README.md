@@ -4,7 +4,7 @@ This section of the repository demonstrates how to implement a scalable End-to-E
 The architecture is designed to support automated regression and smoke testing during application deployment workflows.
 This implementation separates the automation ecosystem into three major components:
 
-🧪 Automation Test Framework
+🧪 Playwright Framework
 ⚙️ CI/CD Automation Repository
 🔗 Source Repository Integration
 
