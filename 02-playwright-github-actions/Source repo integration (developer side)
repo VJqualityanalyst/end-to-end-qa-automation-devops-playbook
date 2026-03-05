@@ -1,1 +1,219 @@
+Playwright Automation Pipeline
 
+Source Repository Integration Guide
+This guide explains how application repositories can integrate with the Playwright Automation Pipeline to automatically trigger test suites during deployment workflows.
+The integration allows application repositories to trigger automation workflows hosted in the Automation Repository using GitHub repository_dispatch events.
+This ensures automated testing is executed during key stages of the deployment lifecycle.
+
+Integration Overview
+After integration, the automation pipeline behaves as follows:
+Application Event	Automation Triggered
+Push to staging	Regression Test Suite
+Pull Request staging → production	Smoke Test Suite
+
+Benefits
+
+Regression tests validate staging deployments
+Smoke tests validate production release readiness
+Automation runs automatically without manual intervention
+Automation Trigger Flow
+
+The following sequence describes how the automation pipeline is triggered:
+A developer pushes code to the staging branch in the application repository.
+The GitHub Actions workflow in the source repository is triggered.
+The workflow authenticates using the AUTOMATION_PAT secret.
+The workflow sends a repository_dispatch event to the Automation Repository.
+The automation repository receives the event and triggers the appropriate test suite:
+run-regression → Executes the Regression Test Suite
+run-smoke → Executes the Smoke Test Suite
+The Playwright automation pipeline runs the tests and reports the results.
+
+Integration Architecture
+Developer Push / PR
+        │
+        ▼
+Application Repository
+(GitHub Actions Workflow)
+        │
+        │ repository_dispatch
+        ▼
+Automation Repository
+(Playwright Automation Pipeline)
+        │
+        ▼
+Test Execution
+ ├─ Regression Suite
+ └─ Smoke Suite
+        │
+        ▼
+Automation Reports
+
+Step 1 — Add GitHub Secret
+Developers must add a Personal Access Token (PAT) to their repository.
+Navigate to:
+Repository → Settings → Secrets and variables → Actions
+Add a new secret with the following details:
+Secret Name
+AUTOMATION_PAT
+Secret Value
+<Personal Access Token provided by the QA team>
+
+Important Notes
+The token must have permission to access the Automation Repository
+If using Classic PAT, enable the repo scope
+If using Fine-grained PAT, ensure:
+The automation repository is selected
+Required read/write permissions are enabled
+
+Step 2 — Create Workflow Folder
+Create the following directory in your repository if it does not already exist:
+.github/workflows
+This directory stores all GitHub Actions workflow files.
+
+Step 3 — Add Automation Trigger Workflow
+Create the following workflow file:
+.github/workflows/staging-regression-trigger.yml
+
+name: Regression Gate for Staging
+on:
+  push:
+    branches:
+      - staging
+  pull_request:
+    branches:
+      - production
+    types:
+      - opened
+      - reopened
+      - synchronize
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Select suite to dispatch to Myndz
+        required: true
+        default: regression
+        type: choice
+        options:
+          - regression
+          - smoke
+          - both
+
+concurrency:
+  group: regression-gate-${{ github.event_name }}-${{ github.ref }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  regression-gate:
+    runs-on: ubuntu-latest
+    env:
+      TARGET_OWNER: VJqualityanalyst       # Update this to the actual owner of the target repository if different
+      TARGET_REPO: XYZ                   # Update this to the actual name of the target repository if different
+
+    steps:
+      - name: Trigger Tests in Myndz
+        id: trigger
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.AUTOMATION_PAT }}" ]; then
+            echo "AUTOMATION_PAT secret is missing in source repo: ${{ github.repository }}"
+            echo "Add secret in Cypress repo Settings -> Secrets and variables -> Actions"
+            exit 1
+          fi
+
+          user_check_status=$(curl -sS -o user_check.json -w "%{http_code}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.AUTOMATION_PAT }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/user")
+
+          echo "Token user check HTTP status: $user_check_status"
+          cat user_check.json || true
+
+          if [ "$user_check_status" != "200" ]; then
+            echo "Invalid or unusable PAT in AUTOMATION_PAT secret for repo ${{ github.repository }}"
+            exit 1
+          fi
+
+          repo_check_status=$(curl -sS -o repo_check.json -w "%{http_code}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.AUTOMATION_PAT }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${TARGET_OWNER}/${TARGET_REPO}")
+
+          echo "Repo access HTTP status: $repo_check_status"
+          cat repo_check.json || true
+
+          if [ "$repo_check_status" != "200" ]; then
+            echo "Token cannot access ${TARGET_OWNER}/${TARGET_REPO}."
+            echo "Important: this workflow reads AUTOMATION_PAT from source repo ${{ github.repository }}, not from ${TARGET_OWNER}/${TARGET_REPO}."
+            echo "Use a PAT that has access to the target repo (classic: repo scope; fine-grained: repository selected with required write permissions)."
+            exit 1
+          fi
+
+          dispatch_event() {
+            event_type="$1"
+            status_code=$(curl -sS -o response.json -w "%{http_code}" -X POST "https://api.github.com/repos/${TARGET_OWNER}/${TARGET_REPO}/dispatches" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ secrets.AUTOMATION_PAT }}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -d "{\"event_type\":\"${event_type}\",\"client_payload\":{\"test_folder\":\"automated_tests\",\"source_repo\":\"${{ github.repository }}\",\"source_sha\":\"${{ github.sha }}\",\"source_event\":\"${{ github.event_name }}\",\"source_base_ref\":\"${{ github.base_ref || '' }}\"}}")
+
+            echo "Dispatch '${event_type}' HTTP status: $status_code"
+            cat response.json || true
+
+            if [ "$status_code" != "204" ]; then
+              echo "Dispatch failed for '${event_type}'. Expected 204 from repository_dispatch API."
+              exit 1
+            fi
+          }
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            suite="${{ github.event.inputs.suite }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            suite="regression"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "${{ github.event.action }}" = "synchronize" ] && [ "${{ github.event.pull_request.head.ref }}" = "staging" ]; then
+              echo "Skipping smoke on synchronize from staging to avoid duplicate run with push-regression."
+              exit 0
+            fi
+            suite="smoke"
+          else
+            echo "Unsupported event '${{ github.event_name }}'"
+            exit 1
+          fi
+
+          if [ "$suite" = "regression" ]; then
+            dispatch_event "run-regression"
+          elif [ "$suite" = "smoke" ]; then
+            dispatch_event "run-smoke"
+          elif [ "$suite" = "both" ]; then
+            dispatch_event "run-regression"
+            dispatch_event "run-smoke"
+          else
+            echo "Unsupported suite '$suite'"
+            exit 1
+          fi
+
+          echo "Triggered '$suite' dispatch in ${TARGET_OWNER}/${TARGET_REPO}"
+
+          
+How the Workflow Works
+Push to Staging
+When code is pushed to the staging branch, the workflow will:
+Trigger the Regression Test Suite
+Validate the staging environment
+Pull Request to Production
+When a pull request is opened from staging to production, the workflow will:
+Trigger the Smoke Test Suite
+Validate the production release
+
+Troubleshooting
+Issue: Missing AUTOMATION_PAT
+Error:
+AUTOMATION_PAT secret is missing in source repo
+Solution
+Add the secret in:
+Repository → Settings → Secrets and variables → Actions
+
+
+✅ This integration ensures automated Playwright test suites are executed automatically during deployment workflows, improving release confidence and reducing production risks.
