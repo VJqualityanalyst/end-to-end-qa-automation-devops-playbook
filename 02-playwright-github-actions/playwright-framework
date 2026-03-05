@@ -3,8 +3,27 @@
 
 A comprehensive and scalable Playwright test automation framework with Page Object Model (POM), reusable utilities, and best practices.
 
-## 📁 Project Structure
 
+🏗 Framework Architecture
+
+Application
+     │
+     │
+Playwright Tests
+     │
+     │
+Page Object Model
+     │
+     │
+Fixtures + Utilities
+     │
+     │
+GitHub Actions CI/CD
+     │
+     │
+HTML Reports + Artifacts
+
+## 📁 Project Structure
 ```
 automated_tests/
 ├── src/                     # Framework source
@@ -333,11 +352,5 @@ https://trace.playwright.dev/
 2. Write tests
 3. Ensure all tests pass
 4. Submit pull request
-
-## 📄 License
-
-ISC
-
----
 
 **Happy Testing! 🎭**
