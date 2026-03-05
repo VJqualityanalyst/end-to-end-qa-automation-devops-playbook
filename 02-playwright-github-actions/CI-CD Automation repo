@@ -1,0 +1,387 @@
+Repository Structure
+
+
+├── playwright-automation-framework
+│   ├── pages
+│   ├── tests
+│   ├── fixtures
+│   ├── utils
+│   └── playwright.config.js
+│
+└── github-actions-cicd
+    ├── playwright-ci.yml
+
+Goal
+
+Pipeline behavior:
+
+1️⃣ Push to staging in application repo → triggers Regression Suite
+2️⃣ PR from staging → production → triggers Smoke Suite
+3️⃣ Push to main in automation repo → triggers Regression Suite
+4️⃣ Manual execution → allows
+
+regression
+smoke
+both
+
+# Cross-Repo Pipeline Runbook
+
+This runbook is the single source of truth for cross-repo automation flow between source repositories and the automation target repository.
+
+---
+
+## 1) Goal
+
+Pipeline behavior:
+
+1. Push to `staging` in source repo triggers **regression** in automation repo.
+2. PR to `production` in source repo triggers **smoke** in automation repo.
+3. Manual trigger supports `regression | smoke | both`.
+
+---
+
+## 2) High-Level Enterprise Flow
+
+### Automation repo (QA team)
+
+- Push to `main` -> run **regression**
+- Manual `workflow_dispatch` -> run **regression** / **smoke** / **both**
+- `repository_dispatch` with `run-regression` -> run **regression**
+- `repository_dispatch` with `run-smoke` -> run **smoke**
+
+### Application/source repos (Dev teams)
+
+- Push to `staging` -> dispatch `run-regression` to automation repo
+- PR `staging -> production` -> dispatch `run-smoke` to automation repo
+- Branch protection -> blocks merge/deploy when required gate fails
+
+---
+
+## 3) Workflow Files Involved
+
+- Source workflow (dispatch sender): `.github/workflows/staging-regression.yml`
+- Target workflow (test executor): `.github/workflows/playwright.yml`
+
+---
+
+## 4) Automation Repo Workflow Details
+
+File: `.github/workflows/playwright.yml`
+
+### Trigger conditions
+
+- `push` on `main`
+- `workflow_dispatch` with input `suite = regression | smoke | both`
+- `repository_dispatch` types:
+  - `run-regression`
+  - `run-smoke`
+
+### Environment setup
+
+- Checkout code
+- Setup Node.js (LTS)
+- Restore npm cache from `automated_tests/package-lock.json`
+- Install dependencies (`npm ci`)
+- Install Playwright browsers/dependencies
+
+### Execution logic
+
+- Run regression when:
+  - event is `push`
+  - OR `repository_dispatch` action is `run-regression`
+  - OR manual input `suite` is `regression` or `both`
+
+- Run smoke when:
+  - `repository_dispatch` action is `run-smoke`
+  - OR manual input `suite` is `smoke` or `both`
+
+### Reporting
+
+- Artifact path: `automated_tests/playwright-report/`
+- Artifact name: `playwright-report`
+- Retention: 30 days
+
+---
+
+## 5) Source Repo Dispatch Workflow Details
+
+File: `.github/workflows/staging-regression.yml`
+
+Implemented/expected behavior:
+
+- Supports `push`, `pull_request`, `workflow_dispatch`
+- Validates secret presence for `AUTOMATION_PAT`
+- Validates token (`GET /user` -> expected `200`)
+- Validates target repo access (`GET /repos/<owner>/<repo>` -> expected `200`)
+- Sends dispatch:
+  - `POST /repos/<owner>/<repo>/dispatches`
+  - `event_type = run-regression` or `run-smoke`
+- Logs HTTP status and response body for troubleshooting
+- Optionally logs latest target run URL after dispatch
+
+---
+
+## 6) Secret and Token Rules
+
+- `AUTOMATION_PAT` must exist in the **source repo** secrets (not only in target repo).
+- PAT owner must have access to automation target repo.
+- Recommended auth:
+  - Classic PAT with `repo` scope, or
+  - Fine-grained PAT scoped to target repo with required Actions/API permissions
+- If org SSO is enforced, authorize PAT for SSO.
+
+---
+
+## 7) Application Repo Gate Flows
+
+### Staging push -> Regression gate
+
+File: `.github/workflows/staging-regression.yml`
+
+1. Listen to push on `staging`.
+2. Dispatch `{"event_type":"run-regression"}` to automation repo.
+3. (Recommended) wait for automation completion.
+4. Fail gate if conclusion is not `success`.
+
+### PR to production -> Smoke gate
+
+File: `.github/workflows/staging-to-prod-smoke.yml`
+
+1. Listen to PR targeting `production`.
+2. Dispatch `{"event_type":"run-smoke"}` to automation repo.
+3. (Recommended) wait for automation completion.
+4. Fail gate if conclusion is not `success`.
+
+---
+
+## 8) Branch Protection (Non-Bypassable)
+
+Configure in application/source repos:
+
+- `staging` branch:
+  - Require status checks
+  - Required check: Regression Gate for Staging
+- `production` branch:
+  - Require status checks
+  - Required check: Smoke Gate for Production
+
+Outcome:
+
+- Regression failure blocks staging promotion.
+- Smoke failure blocks production merge/deploy.
+
+---
+
+## 9) Event-to-Suite Matrix
+
+1. Automation repo push to `main` -> **regression**
+2. Automation manual run `suite=regression` -> **regression**
+3. Automation manual run `suite=smoke` -> **smoke**
+4. Automation manual run `suite=both` -> **regression + smoke**
+5. Source repo push to `staging` -> **regression** (via dispatch)
+6. Source repo PR `staging -> production` -> **smoke** (via dispatch)
+
+---
+
+## 10) Validation and Diagnostics
+
+Expected successful source-side statuses:
+
+1. Token check: `200`
+2. Repo access check: `200`
+3. Dispatch API call: `204`
+
+These confirm:
+
+- token is valid,
+- token can access target repo,
+- dispatch event is accepted.
+
+---
+
+## 11) Why Tests May Show as 0 Executed
+
+If scripts use grep tags:
+
+- `npm run test:regression` -> `playwright test --grep "@regression"`
+- `npm run test:smoke` -> `playwright test --grep "@smoke"`
+
+Runs can execute 0 tests when tags are missing in test files.
+
+---
+
+## 12) Quick Checklist
+
+- [ ] `.github/workflows/` exists in each source repo
+- [ ] Approved workflow YAML files are placed in `.github/workflows/`
+- [ ] `AUTOMATION_PAT` exists in each source repo/environment
+- [ ] Required variables/secrets match YAML names
+- [ ] Workflow appears in GitHub Actions tab
+- [ ] One validation run completed for staging source repo
+- [ ] One validation run completed for production source repo
+- [ ] Playwright report artifact appears in automation run
+- [ ] Branch protection required checks are enabled
+
+---
+
+## 13) Troubleshooting
+
+If execution fails:
+
+1. Confirm workflow file path is exactly `.github/workflows/<workflow-file>.yml`.
+2. Confirm secret names exactly match workflow expectations.
+3. Confirm token permissions and repo visibility.
+4. Confirm target workflow exists on target default branch.
+5. Confirm branch protection/workflow permissions are not blocking execution.
+
+---
+
+## 14) Optional Hard Gate (If Strict Blocking Needed)
+
+To enforce strict quality gate:
+
+1. Dispatch target workflow.
+2. Poll target run status until completion.
+3. If conclusion != `success`, fail source job (`exit 1`).
+4. Mark this source gate as required in branch protection.
+
+---
+
+## 15) Handover Template (for Repo Owners)
+
+Please set up the cross-repo workflow in your source repository.
+
+Steps:
+
+1. Create `.github/workflows/`
+2. Add `<workflow-file>.yml` (same baseline content)
+3. Add required secrets/variables for your environment
+4. Run one test workflow and share the Actions run URL
+
+Done criteria:
+
+- Workflow exists and is enabled
+- Run completed successfully
+- Run URL shared with QA/Automation owner
+
+---
+
+## 16) Summary
+
+Cross-repo dispatch execution is established when source diagnostics show `200 / 200 / 204` and target workflow runs successfully. Final release safety depends on branch protection, optional wait-for-result gating, and correct test tagging strategy.
+
+playwright-ci.yml-
+
+name: Playwright Tests (Enterprise Hybrid)
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  repository_dispatch:
+    types:
+      - run-regression
+      - run-smoke
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Select suite to run in Myndz
+        required: true
+        default: regression
+        type: choice
+        options:
+          - regression
+          - smoke
+          - both
+
+permissions:
+  contents: read
+
+jobs:
+  regression-suite:
+    if: |
+      (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'staging')) ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'run-regression' && github.event.client_payload.source_event == 'push') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.suite == 'regression' || github.event.inputs.suite == 'both'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: automated_tests/package-lock.json
+
+      - name: Install dependencies
+        working-directory: automated_tests
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: automated_tests
+        run: npx playwright install --with-deps
+
+      - name: Run regression suite
+        working-directory: automated_tests
+        env:
+          TEST_ENV: staging
+        run: npm run test:regression
+
+      - name: Upload Playwright report (regression)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-regression
+          path: automated_tests/playwright-report/
+          retention-days: 30
+
+  smoke-suite:
+    if: |
+      (github.event_name == 'pull_request' && github.head_ref == 'production') ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'run-smoke' && github.event.client_payload.source_event == 'pull_request' && github.event.client_payload.source_base_ref == 'production') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: automated_tests/package-lock.json
+
+      - name: Install dependencies
+        working-directory: automated_tests
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: automated_tests
+        run: npx playwright install --with-deps
+
+      - name: Run smoke suite
+        working-directory: automated_tests
+        env:
+          TEST_ENV: production
+        run: npm run test:smoke
+
+      - name: Upload Playwright report (smoke)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-smoke
+          path: automated_tests/playwright-report/
+          retention-days: 30
+
+For Cross repo execution we need to provide YML file or code to developer which they will use in their source repo from their they want trigger our actual code, like they can put the code 
