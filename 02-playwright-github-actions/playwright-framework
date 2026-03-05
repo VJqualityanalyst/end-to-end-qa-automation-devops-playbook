@@ -1,1 +1,343 @@
 
+# Playwright Test Automation Framework
+
+A comprehensive and scalable Playwright test automation framework with Page Object Model (POM), reusable utilities, and best practices.
+
+## 📁 Project Structure
+
+```
+automated_tests/
+├── src/                     # Framework source
+│   ├── config/              # Configuration files
+│   │   └── environment.js    # Environment-specific settings
+│   ├── pages/               # Page Object Model (POM)
+│   │   ├── BasePage.js       # Base page with common methods
+│   │   ├── HomePage.js       # Home page object
+│   │   └── LoginPage.js      # Login page object
+│   ├── tests/               # Test specifications
+│   │   ├── example.spec.js   # Example UI tests
+│   │   ├── login.spec.js     # Login tests
+│   │   ├── api.spec.js       # API tests
+│   │   └── visual.spec.js    # Visual regression tests
+│   ├── fixtures/            # Custom test fixtures
+│   │   └── testFixtures.js   # Reusable fixtures
+│   └── utils/               # Utility functions
+│       ├── logger.js         # Logging utility
+│       ├── dataGenerator.js  # Test data generation
+│       ├── waitHelper.js     # Wait utilities
+│       └── testHelper.js     # Common test helpers
+├── test-data/               # Test data files
+│   ├── users.js              # User credentials
+│   └── testData.js           # General test data
+├── playwright.config.js     # Playwright configuration
+├── package.json            # Project dependencies
+└── .env.example            # Environment variables template
+```
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js (v18 or higher)
+- npm or yarn
+
+### Installation
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Install Playwright browsers:**
+   ```bash
+   npm run install:browsers
+   ```
+
+3. **Set up environment variables:**
+   ```bash
+   cp .env.example .env
+   # Edit .env file with your configuration
+   ```
+
+## 🧪 Running Tests
+
+### Basic Commands
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in headed mode (see browser)
+npm run test:headed
+
+# Run tests in UI mode (interactive)
+npm run test:ui
+
+# Run tests in debug mode
+npm run test:debug
+```
+
+### Browser-Specific Tests
+
+```bash
+# Run tests on Chromium
+npm run test:chromium
+
+# Run tests on Firefox
+npm run test:firefox
+
+# Run tests on WebKit (Safari)
+npm run test:webkit
+
+# Run tests on mobile browsers
+npm run test:mobile
+```
+
+### Environment-Specific Tests
+
+```bash
+# Run tests on STAGING (default)
+npm run test:staging
+npm run test:staging:headed
+npm run test:staging:ui
+
+# Run tests on PRODUCTION
+npm run test:production
+npm run test:production:headed
+npm run test:production:ui
+```
+
+### Parallel & Serial Execution
+
+```bash
+# Run tests in parallel (4 workers)
+npm run test:parallel
+
+# Run tests serially (1 worker)
+npm run test:serial
+```
+
+### Tagged Tests
+
+```bash
+# Run smoke tests
+npm run test:smoke
+
+# Run regression tests
+npm run test:regression
+```
+
+### View Reports
+
+```bash
+# Show HTML report
+npm run report
+
+# Open HTML report in browser
+npm run report:open
+```
+
+## 📝 Writing Tests
+
+### Using Page Objects
+
+```javascript
+import { test, expect } from '../fixtures/testFixtures.js';
+
+test('example test', async ({ homePage, logger }) => {
+  logger.step('Navigate to home page');
+  await homePage.open('https://example.com');
+  
+  logger.step('Verify page is loaded');
+  const isLoaded = await homePage.isPageLoaded();
+  expect(isLoaded).toBeTruthy();
+});
+```
+
+### Data-Driven Testing
+
+```javascript
+import { users } from '../test-data/users.js';
+
+test('login test', async ({ loginPage }) => {
+  await loginPage.open('https://example.com/login');
+  await loginPage.login(users.validUser.username, users.validUser.password);
+});
+```
+
+### Using Test Tags
+
+```javascript
+test('smoke test example @smoke', async ({ page }) => {
+  // Smoke test code
+});
+
+test('regression test example @regression', async ({ page }) => {
+  // Regression test code
+});
+```
+
+## 🎯 Framework Features
+
+### Page Object Model (POM)
+- **BasePage**: Contains common methods for all pages
+- **Reusable Components**: Modular page objects
+- **Maintainability**: Easy to update when UI changes
+
+### Custom Fixtures
+- Auto-inject page objects
+- Automatic screenshot on failure
+- Logger and helpers available in tests
+
+### Utilities
+- **Logger**: Structured logging for test steps
+- **Data Generator**: Generate random test data using Faker.js
+- **Wait Helper**: Smart wait utilities
+- **Test Helper**: Common helper functions
+
+### Configuration Management
+- Environment-specific settings
+- Support for dev, staging, and production
+- Easy environment switching via `.env`
+
+### Reporting
+- HTML reports (default)
+- JSON reports for CI/CD integration
+- JUnit XML reports
+- Screenshots and videos on failure
+- Trace files for debugging
+
+## 📊 Test Reports
+
+After running tests, reports are available in:
+- **HTML Report**: `playwright-report/index.html`
+- **JSON Report**: `test-results/results.json`
+- **JUnit Report**: `test-results/junit.xml`
+
+## 🔧 Configuration
+
+### Environment Setup
+
+The framework supports **STAGING** and **PRODUCTION** environments:
+
+1. **Edit `.env` file** with your credentials:
+```env
+TEST_ENV=staging                        # or 'production'
+
+# Staging
+STAGING_URL=https://staging.example.com
+STAGING_VALID_USERNAME=user@staging.com
+STAGING_VALID_PASSWORD=Pass123
+
+# Production  
+PRODUCTION_URL=https://production.example.com
+PRODUCTION_VALID_USERNAME=user@prod.com
+PRODUCTION_VALID_PASSWORD=Pass123
+```
+
+2. **Run tests on specific environment**:
+```bash
+npm run test:staging      # Run on staging
+npm run test:production   # Run on production
+```
+
+See [ENVIRONMENT_GUIDE.md](ENVIRONMENT_GUIDE.md) for complete documentation.
+
+### Environment Variables
+
+Edit `.env` file to configure:
+
+```env
+TEST_ENV=dev                    # Environment (dev/staging/production)
+HEADLESS=false                  # Run in headless mode
+BROWSER=chromium                # Default browser
+WORKERS=4                       # Parallel workers
+```
+
+### Playwright Config
+
+Main configuration in [playwright.config.js](playwright.config.js):
+- Test directory
+- Timeouts
+- Retries
+- Reporters
+- Browser projects
+- Screenshots and videos
+
+## 🏗️ Creating New Page Objects
+
+1. Create a new file in `pages/` folder
+2. Extend `BasePage` class
+3. Define locators and methods
+
+```javascript
+import { BasePage } from './BasePage.js';
+
+export class MyPage extends BasePage {
+  constructor(page) {
+    super(page);
+    this.locators = {
+      element: '#my-element',
+    };
+  }
+
+  async myAction() {
+    await this.clickElement(this.locators.element);
+  }
+}
+```
+
+## 📚 Best Practices
+
+1. **Use Page Objects**: Keep selectors and page logic in page objects
+2. **Use Fixtures**: Leverage custom fixtures for cleaner tests
+3. **Log Test Steps**: Use logger for better debugging
+4. **Data-Driven Tests**: Externalize test data
+5. **Tag Tests**: Use tags for organizing test suites
+6. **Screenshots**: Automatic screenshots on failure
+7. **Parallel Execution**: Use workers for faster execution
+8. **Environment Config**: Use environment variables for flexibility
+
+## 🐛 Debugging
+
+### Debug Mode
+```bash
+npm run test:debug
+```
+
+### UI Mode (Interactive Debugging)
+```bash
+npm run test:ui
+```
+
+### Generate Test Code
+```bash
+npm run codegen
+```
+
+### View Trace Files
+When tests fail, trace files are captured. View them at:
+```
+https://trace.playwright.dev/
+```
+
+## 📖 Additional Resources
+
+- [Playwright Documentation](https://playwright.dev/)
+- [Best Practices](https://playwright.dev/docs/best-practices)
+- [API Reference](https://playwright.dev/docs/api/class-playwright)
+
+## 🤝 Contributing
+
+1. Create feature branch
+2. Write tests
+3. Ensure all tests pass
+4. Submit pull request
+
+## 📄 License
+
+ISC
+
+---
+
+**Happy Testing! 🎭**
