@@ -383,5 +383,3 @@ jobs:
           name: playwright-report-smoke
           path: automated_tests/playwright-report/
           retention-days: 30
-
-For Cross repo execution we need to provide YML file or code to developer which they will use in their source repo from their they want trigger our actual code, like they can put the code 
