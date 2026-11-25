@@ -1,6 +1,6 @@
-Repository Structure
+## Repository Structure
 
-
+```
 ├── playwright-automation-framework
 │   ├── pages
 │   ├── tests
@@ -10,8 +10,9 @@ Repository Structure
 │
 └── github-actions-cicd
     ├── playwright-ci.yml
+```
 
-Goal
+## Goal
 
 Pipeline behavior:
 
@@ -270,8 +271,9 @@ Done criteria:
 
 Cross-repo dispatch execution is established when source diagnostics show `200 / 200 / 204` and target workflow runs successfully. Final release safety depends on branch protection, optional wait-for-result gating, and correct test tagging strategy.
 
-playwright-ci.yml-
+## Workflow file: `.github/workflows/playwright-ci.yml`
 
+```yaml
 name: Playwright Tests (Enterprise Hybrid)
 
 on:
@@ -307,7 +309,7 @@ jobs:
   regression-suite:
     if: |
       (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'staging')) ||
-      (github.event_name == 'repository_dispatch' && github.event.action == 'run-regression' && github.event.client_payload.source_event == 'push') ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'run-regression') ||
       (github.event_name == 'workflow_dispatch' && (github.event.inputs.suite == 'regression' || github.event.inputs.suite == 'both'))
     runs-on: ubuntu-latest
 
@@ -346,8 +348,8 @@ jobs:
 
   smoke-suite:
     if: |
-      (github.event_name == 'pull_request' && github.head_ref == 'production') ||
-      (github.event_name == 'repository_dispatch' && github.event.action == 'run-smoke' && github.event.client_payload.source_event == 'pull_request' && github.event.client_payload.source_base_ref == 'production') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'production') ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'run-smoke') ||
       (github.event_name == 'workflow_dispatch' && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both'))
     runs-on: ubuntu-latest
 
@@ -383,3 +385,4 @@ jobs:
           name: playwright-report-smoke
           path: automated_tests/playwright-report/
           retention-days: 30
+```
