@@ -1,22 +1,22 @@
-Playwright Automation Pipeline
+# Playwright Automation Pipeline
 
-Source Repository Integration Guide
+## Source Repository Integration Guide
 This guide explains how application repositories can integrate with the Playwright Automation Pipeline to automatically trigger test suites during deployment workflows.
 The integration allows application repositories to trigger automation workflows hosted in the Automation Repository using GitHub repository_dispatch events.
 This ensures automated testing is executed during key stages of the deployment lifecycle.
 
-Integration Overview
+## Integration Overview
 After integration, the automation pipeline behaves as follows:
 Application Event	Automation Triggered
 Push to staging	Regression Test Suite
 Pull Request staging → production	Smoke Test Suite
 
-Benefits
+## Benefits
 
 Regression tests validate staging deployments
 Smoke tests validate production release readiness
 Automation runs automatically without manual intervention
-Automation Trigger Flow
+## Automation Trigger Flow
 
 The following sequence describes how the automation pipeline is triggered:
 A developer pushes code to the staging branch in the application repository.
@@ -28,7 +28,8 @@ run-regression → Executes the Regression Test Suite
 run-smoke → Executes the Smoke Test Suite
 The Playwright automation pipeline runs the tests and reports the results.
 
-Integration Architecture
+## Integration Architecture
+```
 Developer Push / PR
         │
         ▼
@@ -47,8 +48,9 @@ Test Execution
         │
         ▼
 Automation Reports
+```
 
-Step 1 — Add GitHub Secret
+## Step 1 — Add GitHub Secret
 Developers must add a Personal Access Token (PAT) to their repository.
 Navigate to:
 Repository → Settings → Secrets and variables → Actions
@@ -58,22 +60,23 @@ AUTOMATION_PAT
 Secret Value
 <Personal Access Token provided by the QA team>
 
-Important Notes
+## Important Notes
 The token must have permission to access the Automation Repository
 If using Classic PAT, enable the repo scope
 If using Fine-grained PAT, ensure:
 The automation repository is selected
 Required read/write permissions are enabled
 
-Step 2 — Create Workflow Folder
+## Step 2 — Create Workflow Folder
 Create the following directory in your repository if it does not already exist:
-.github/workflows
+`.github/workflows`
 This directory stores all GitHub Actions workflow files.
 
-Step 3 — Add Automation Trigger Workflow
+## Step 3 — Add Automation Trigger Workflow
 Create the following workflow file:
-.github/workflows/staging-regression-trigger.yml
+`.github/workflows/staging-regression-trigger.yml`
 
+```yaml
 name: Regression Gate for Staging
 on:
   push:
@@ -195,9 +198,10 @@ jobs:
           fi
 
           echo "Triggered '$suite' dispatch in ${TARGET_OWNER}/${TARGET_REPO}"
+```
 
           
-How the Workflow Works
+## How the Workflow Works
 Push to Staging
 When code is pushed to the staging branch, the workflow will:
 Trigger the Regression Test Suite
@@ -207,7 +211,7 @@ When a pull request is opened from staging to production, the workflow will:
 Trigger the Smoke Test Suite
 Validate the production release
 
-Troubleshooting
+## Troubleshooting
 Issue: Missing AUTOMATION_PAT
 Error:
 AUTOMATION_PAT secret is missing in source repo
