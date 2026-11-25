@@ -4,9 +4,9 @@ This section of the repository demonstrates how to implement a scalable End-to-E
 The architecture is designed to support automated regression and smoke testing during application deployment workflows.
 This implementation separates the automation ecosystem into three major components:
 
-🧪 Playwright Framework
-⚙️ CI/CD Automation Repository
-🔗 Source Repository Integration
+- 🧪 [Playwright Framework](https://github.com/VJqualityanalyst/playwright-automation-framework): POM, fixtures, environment config
+- ⚙️ [CI/CD Automation Repository](./ci-cd-automation-repo.md): regression and smoke pipeline, runbook
+- 🔗 [Source Repository Integration](./source-repo-integration.md): trigger tests from application repos
 
 This design allows teams to centrally manage automation pipelines while enabling multiple application repositories to trigger automated tests.
 
