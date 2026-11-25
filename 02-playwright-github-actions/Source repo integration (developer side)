@@ -89,7 +89,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Select suite to dispatch to Myndz
+        description: Select which test suite to trigger
         required: true
         default: regression
         type: choice
@@ -110,13 +110,13 @@ jobs:
       TARGET_REPO: XYZ                   # Update this to the actual name of the target repository if different
 
     steps:
-      - name: Trigger Tests in Myndz
+      - name: Trigger Tests in Automation Repo
         id: trigger
         shell: bash
         run: |
           if [ -z "${{ secrets.AUTOMATION_PAT }}" ]; then
             echo "AUTOMATION_PAT secret is missing in source repo: ${{ github.repository }}"
-            echo "Add secret in Cypress repo Settings -> Secrets and variables -> Actions"
+            echo "Add secret in source repo Settings -> Secrets and variables -> Actions"
             exit 1
           fi
 
