@@ -291,7 +291,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Select suite to run in Myndz
+        description: Select which test suite to run
         required: true
         default: regression
         type: choice
